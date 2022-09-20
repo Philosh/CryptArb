@@ -1,95 +1,50 @@
+const fetch = require("node-fetch");
+
 const http = require("http");
-const axios = require("axios");
+const CONFIG = require("./cryptoConfig.js");
 
 const hostname = "127.0.0.1";
 const port = 3000;
 
-const URLS = {
-  FTX_API: "https://ftx.com/api/",
-  KRAKEN_API: "https://api.kraken.com/0/public/",
-  COINTIGER_URL: "https://www.cointiger.com/exchange/api/public/market/detail",
-};
-
 const requestMarketData = () => {
-  axios
-    .get(URLS.FTX_API + "markets")
-    .then((res) => {
-      return {
-        ftxQuotes: res.data.result
-          .map((e) => ({
-            name: e.name,
-            last: e.last,
-          }))
-          .filter((e) => {
-            return e.name.includes("USD");
-          })
-          .map((e) => ({
-            name: e.name.split("/")[0],
-            last: e.last,
-          })),
-      };
-    })
-    .then((res) => {
-      res.ftxQuotes.forEach((ftxQuote) => {
-        axios
-          .get(URLS.KRAKEN_API + "OHLC?pair=" + ftxQuote.name + "usd")
-          .then((res2) => {
-            if (res2.data.error.length === 0) {
-              const krakenClose = Object.values(res2.data.result)[0].slice(
-                -1
-              )[0][4];
-              const gain1 =
-                (Math.abs(krakenClose - ftxQuote.last) / krakenClose) * 100;
-              const gain2 =
-                (Math.abs(ftxQuote.last - krakenClose) / ftxQuote.last) * 100;
+  const ftxQuotes = fetch(CONFIG.MARKET.FTX.APIURL + "markets")
+    .then((res) => res.json())
+    .then((data) =>
+      data.result
+        .map((e) => ({ name: e.name, last: e.last, bid: e.bid, ask: e.ask }))
+        .filter((e) => e.name.includes("USD"))
+        .filter((e) => !e.name.includes("USDT"))
+    );
 
-              if (gain1 > 2 || gain2 > 2) {
-                console.log(
-                  gain1,
-                  gain2,
-                  ftxQuote.name,
-                  krakenClose,
-                  ftxQuote.last
-                );
-              }
-            }
-          });
+  const krakenQuotes = fetch(CONFIG.MARKET.KRAKEN.APIURL + "Assets")
+    .then((res) => res.json())
+    .then((data) => {
+      const assetPairs = Object.keys(data.result)
+        .filter((e) => !e.includes(".") && !/\d/.test(e))
+        .filter((e) => e.substring(0, 2) !== "XX")
+        .map((e) => e + "USD");
+
+      const krakenPromises = assetPairs.map((e) => {
+        return fetch(CONFIG.MARKET.KRAKEN.APIURL + "Ticker?pair=" + e).then(
+          (res) =>
+            res.json().then((data) => {
+              return data.result;
+            })
+        );
       });
 
-      return { ftxQuotes: res.ftxQuotes };
-    })
-    .then((res) => {
-      axios.get(URLS.COINTIGER_URL).then((res3) => {
-        res.ftxQuotes.forEach((ftxQuote) => {
-          if (res3.data[ftxQuote.name + "USDT"]) {
-            gain1 =
-              (Math.abs(
-                ftxQuote.last - res3.data[ftxQuote.name + "USDT"].last
-              ) /
-                ftxQuote.last) *
-              100;
-            gain2 =
-              (Math.abs(
-                res3.data[ftxQuote.name + "USDT"].last - ftxQuote.last
-              ) /
-                res3.data[ftxQuote.name + "USDT"].last) *
-              100;
-            if (gain1 > 2 || gain2 > 2) {
-              console.log("cointiger", {
-                cname: ftxQuote.name,
-                ftxQuote: ftxQuote.last,
-                coinQuote: res3.data[ftxQuote.name + "USDT"].last,
-                gain1: gain1,
-                gain2: gain2,
-              });
-            }
-          }
-        });
-      });
-    })
-    .catch((error) => {
-      console.error(error.message);
+      return Promise.all(krakenPromises).then((res) => res.filter((e) => e));
     });
+
+  const cointigerQuotes = fetch(
+    CONFIG.MARKET.COINTIGER.APIURL + "market/detail"
+  )
+    .then((res) => res.json())
+    .then((data) => data);
+
+  Promise.all([cointigerQuotes]).then((res) =>
+    res.forEach((e) => console.log("Result: ", e))
+  );
 };
 
 const server = http.createServer((req, res) => {
