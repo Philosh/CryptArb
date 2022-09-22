@@ -1,5 +1,5 @@
 const fetch = require("node-fetch");
-
+const axios = require("axios");
 const http = require("http");
 const CONFIG = require("./cryptoConfig.js");
 
@@ -111,9 +111,24 @@ const requestMarketData = () => {
     }))
     .catch(console.log);
 
-  Promise.all([ftxQuotes, krakenQuotes]).then((res) => {
-    displayArbitrage(res);
-  });
+  const gateIOQuotes = fetch(CONFIG.MARKET.GATEIO.APIURL + "spot/tickers")
+    .then((res) => res.json())
+    .then((data) => {
+      return {
+        gateIOQuotes: data.map((e) => ({
+          name: e.currency_pair.split("_").join(""),
+          last: e.last,
+          ask: e.lowest_ask,
+          bid: e.highest_bid,
+        })),
+      };
+    });
+
+  Promise.all([ftxQuotes, krakenQuotes, mexcQuotes, gateIOQuotes]).then(
+    (res) => {
+      displayArbitrage(res);
+    }
+  );
 };
 
 const displayArbitrage = (marketsQuotes) => {
@@ -125,20 +140,13 @@ const displayArbitrage = (marketsQuotes) => {
       const marketName2 = Object.keys(marketQuotesObj2)[0];
       marketQuotesObj1[marketName1].forEach((marketQuoteObj1) => {
         marketQuotesObj2[marketName2].forEach((marketQuoteObj2) => {
-          const compMarketName1 = marketName1.slice(0, -1);
-          const compMarketName2 = marketName2.slice(0, -1);
+          const compTickerName1 = marketQuoteObj1.name.slice(0, -1);
+          const compTickerName2 = marketQuoteObj2.name.slice(0, -1);
           if (
             marketQuoteObj1.name === marketQuoteObj2.name ||
-            compMarketName1 === marketQuoteObj2.name ||
-            compMarketName2 === marketQuoteObj1.name
+            compTickerName1 === marketQuoteObj2.name ||
+            compTickerName2 === marketQuoteObj1.name
           ) {
-            console.log(
-              "common ",
-              marketName1,
-              compMarketName1,
-              marketName2,
-              compMarketName2
-            );
             const price1 =
               ((marketQuoteObj2.bid - marketQuoteObj1.ask) /
                 marketQuoteObj1.ask) *
@@ -148,12 +156,28 @@ const displayArbitrage = (marketsQuotes) => {
                 marketQuoteObj2.ask) *
               100;
 
-            if ((price1 > 2 && price1 < 5) || (price2 > 2 && price2 < 5)) {
-              console.log("-------");
-              console.log("market1: ", marketName1, ", market2: ", marketName2);
-              console.log(marketQuoteObj1, marketQuoteObj2);
-              console.log("price1 : ", price1, " price2 : ", price2);
-              console.log("-------");
+            if (price1 > 2 && price1 < 20) {
+              console.log("--x-xx---x--");
+              const arbSentence = `BUY ${marketQuoteObj1.name} from ${
+                marketName1.split("Quotes")[0]
+              } @ ${marketQuoteObj1.ask}\nSELL ${marketQuoteObj2.name} to ${
+                marketName2.split("Quotes")[0]
+              } @ ${marketQuoteObj2.bid}`;
+              console.log(arbSentence);
+              const sent = `potential gain ${price1.toFixed(2)} %`;
+              console.log(sent);
+              console.log("--x--xx-xx-x---");
+            } else if (price2 > 2 && price2 < 20) {
+              console.log("--x--x--xx--");
+              const arbSentence = `BUY ${marketQuoteObj2.name} from ${
+                marketName2.split("Quotes")[0]
+              } @ ${marketQuoteObj2.ask}\nSELL ${marketQuoteObj1.name} to ${
+                marketName1.split("Quotes")[0]
+              } @ ${marketQuoteObj1.bid}`;
+              console.log(arbSentence);
+              const sent = `potential gain ${price2.toFixed(2)} %`;
+              console.log(sent);
+              console.log("--xx--x--xx-x--");
             }
           }
         });
@@ -163,7 +187,6 @@ const displayArbitrage = (marketsQuotes) => {
   marketsQuotes.forEach((marketQuotes) => {
     const marketName = Object.keys(marketQuotes)[0];
     console.log("marketName", marketName);
-    console.log(marketQuotes[marketName][0]);
   });
 };
 
@@ -171,7 +194,20 @@ const server = http.createServer((req, res) => {
   res.statusCode = 200;
   res.setHeader("Content-Type", "text/plain");
   requestMarketData();
-  res.end("Hello World");
+  const resp = axios.get("https://www.gate.io/en/fee").then((data) => {
+    const lines = data.data.split("\n");
+
+    const line = lines.filter((line) =>
+      line.trim().includes("const withdraw_feelist")
+    );
+    console.log(line);
+    const json = line.substring(line.indexOf("{"), line.indexOf(";"));
+
+    const items = JSON.parse(json);
+    console.log(items);
+  });
+
+  res.end("Hello world");
 });
 
 server.listen(port, hostname, () => {

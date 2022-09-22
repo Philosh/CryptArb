@@ -12,6 +12,9 @@ const MARKET = {
   MEXC: {
     APIURL: "https://www.mexc.com/",
   },
+  GATEIO: {
+    APIURL: "https://api.gateio.ws/api/v4/",
+  },
 };
 
 module.exports = {
