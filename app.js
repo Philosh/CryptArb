@@ -132,6 +132,7 @@ const requestMarketData = () => {
 };
 
 const displayArbitrage = (marketsQuotes) => {
+  console.log("marketQuotes", marketsQuotes);
   for (let i = 0; i < marketsQuotes.length; i++) {
     const marketQuotesObj1 = marketsQuotes[i];
     const marketName1 = Object.keys(marketQuotesObj1)[0];
@@ -194,18 +195,6 @@ const server = http.createServer((req, res) => {
   res.statusCode = 200;
   res.setHeader("Content-Type", "text/plain");
   requestMarketData();
-  const resp = axios.get("https://www.gate.io/en/fee").then((data) => {
-    const lines = data.data.split("\n");
-
-    const line = lines.filter((line) =>
-      line.trim().includes("const withdraw_feelist")
-    );
-    console.log(line);
-    const json = line.substring(line.indexOf("{"), line.indexOf(";"));
-
-    const items = JSON.parse(json);
-    console.log(items);
-  });
 
   res.end("Hello world");
 });
