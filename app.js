@@ -2,6 +2,7 @@ const fetch = require("node-fetch");
 const axios = require("axios");
 const http = require("http");
 const CONFIG = require("./cryptoConfig.js");
+const cryptoUtilities = require("./cryptoUtilities");
 
 const hostname = "127.0.0.1";
 const port = 3000;
@@ -29,12 +30,7 @@ const requestMarketData = () => {
         })
         .filter((e) => e.name.split("/")[0] !== "USD")
         .map((e) => ({ ...e, name: e.name.split("/").join("") })),
-      marketInfo: {
-        name: "FTX",
-        apiURL: CONFIG.MARKET.FTX.APIURL,
-        getOrderBookURL: CONFIG.MARKET.FTX.getOrderBookURL,
-        tickJoiner: "/",
-      },
+      marketInfo: CONFIG.MARKET.FTX,
     }));
 
   const krakenQuotes = fetch(CONFIG.MARKET.KRAKEN.APIURL + "Assets")
@@ -67,12 +63,7 @@ const requestMarketData = () => {
               ask: tickerObj.a[0],
             };
           }),
-        marketInfo: {
-          name: "KRAKEN",
-          apiURL: CONFIG.MARKET.KRAKEN.APIURL,
-          getOrderBookURL: CONFIG.MARKET.KRAKEN.getOrderBookURL,
-          tickJoiner: "",
-        },
+        marketInfo: CONFIG.MARKET.KRAKEN,
       }));
     });
 
@@ -99,12 +90,7 @@ const requestMarketData = () => {
       });
       return {
         COINTIGER: coinTigerQuotes,
-        marketInfo: {
-          name: "COINTIGER",
-          apiURL: CONFIG.MARKET.COINTIGER.APIURL,
-          getOrderBookURL: CONFIG.MARKET.COINTIGER.getOrderBookURL,
-          tickJoiner: "",
-        },
+        marketInfo: CONFIG.MARKET.COINTIGER,
       };
     })
     .catch(console.log);
@@ -135,12 +121,7 @@ const requestMarketData = () => {
           bid: e.bid,
           ask: e.ask,
         })),
-      marketInfo: {
-        name: "MEXC",
-        apiURL: CONFIG.MARKET.MEXC.APIURL,
-        getOrderBookURL: CONFIG.MARKET.MEXC.getOrderBookURL,
-        tickJoiner: "_",
-      },
+      marketInfo: CONFIG.MARKET.MEXC,
     }))
     .catch(console.log);
 
@@ -154,27 +135,17 @@ const requestMarketData = () => {
           ask: e.lowest_ask,
           bid: e.highest_bid,
         })),
-        marketInfo: {
-          name: "GATEIO",
-          apiURL: CONFIG.MARKET.GATEIO.APIURL,
-          getOrderBookURL: CONFIG.MARKET.GATEIO.getOrderBookURL,
-          tickJoiner: "_",
-        },
+        marketInfo: CONFIG.MARKET.GATEIO,
       };
     });
 
-  Promise.all([
-    ftxQuotes,
-    krakenQuotes,
-    mexcQuotes,
-    gateIOQuotes,
-    coinTigerQuotes,
-  ]).then((res) => {
+  Promise.all([mexcQuotes, gateIOQuotes]).then((res) => {
     displayArbitrage(res);
   });
 };
 
 const displayArbitrage = (marketsQuotes) => {
+  const orderBookURLS = [];
   for (let i = 0; i < marketsQuotes.length; i++) {
     const marketQuotesObj1 = marketsQuotes[i];
     const marketName1 = Object.keys(marketQuotesObj1)[0];
@@ -222,24 +193,15 @@ const displayArbitrage = (marketsQuotes) => {
               // console.log(arbSentence);
               // const sent = `potential gain ${price1.toFixed(2)} %`;
               // console.log(sent);
-              const buyOrderBook = fetch(marketInfo1.getOrderBookURL(ticker1))
-                .then((res) => res.json())
-                .then((data) => data);
-              const sellOrderBook = fetch(marketInfo2.getOrderBookURL(ticker2))
-                .then((res) => res.json())
-                .then((data) => data);
-              Promise.all([buyOrderBook, sellOrderBook]).then((res) => {
-                console.log(
-                  marketName1,
-                  "Buy Order Book",
-                  buyOrderBook,
-                  "\n",
-                  marketName2,
-                  "Sell order book",
-                  sellOrderBook
-                );
+              orderBookURLS.push({
+                buyMarket: marketName1,
+                buy: marketInfo1.getOrderBookURL(ticker1),
+                buyMarketInfo: marketInfo1,
+                sellMarket: marketName2,
+                sell: marketInfo2.getOrderBookURL(ticker2),
+                sellMarketInfo: marketInfo2,
               });
-              sleep(100);
+
               console.log(
                 "BUY from ",
                 marketName1,
@@ -261,6 +223,16 @@ const displayArbitrage = (marketsQuotes) => {
               // console.log(arbSentence);
               // const sent = `potential gain ${price2.toFixed(2)} %`;
               // console.log(sent);
+
+              orderBookURLS.push({
+                buyMarket: marketName2,
+                buy: marketInfo2.getOrderBookURL(ticker2),
+                buyMarketInfo: marketInfo2,
+                sellMarket: marketName1,
+                sell: marketInfo1.getOrderBookURL(ticker1),
+                sellMarketInfo: marketInfo1,
+              });
+
               console.log(
                 "BUY from ",
                 marketName2,
@@ -279,6 +251,40 @@ const displayArbitrage = (marketsQuotes) => {
     }
   }
 
+  const delay = 500;
+
+  orderBookURLS.map(async (orderBook, index) => {
+    return new Promise((resolve) => setTimeout(resolve, delay * index)).then(
+      async () => {
+        const orderBook1 = fetch(orderBook.buy)
+          .then((res) => res.json())
+          .then((data) => data);
+        const orderBook2 = fetch(orderBook.sell)
+          .then((res) => res.json())
+          .then((data) => data);
+        Promise.all([orderBook1, orderBook2]).then((res) => {
+          // const buyOB = cryptoUtilities.findVal(res[0], "asks");
+          // const sellOB = cryptoUtilities.findVal(res[1], "bids");
+          // cryptoUtilities.calculateProfitFromOB(buyOB, sellOB);
+
+          const buyOB = orderBook.buyMarketInfo.processOBData(res[0], "asks");
+          const sellOB = orderBook.sellMarketInfo.processOBData(res[1], "bids");
+          cryptoUtilities.calculateProfitFromOB(buyOB, sellOB);
+          // console.log(
+          //   orderBook.buyMarket,
+          //   "Buy Order Book for",
+          //   orderBook.buy,
+          //   orderBook.buyMarketInfo.processOBData(res[0], "asks"),
+          //   "\n",
+          //   orderBook.sellMarket,
+          //   "Sell order book for",
+          //   orderBook.sell,
+          //   orderBook.sellMarketInfo.processOBData(res[1], "bids")
+          // );
+        });
+      }
+    );
+  });
   console.log(CONFIG.MARKET.FTX.getOrderBookURL("BTC/USD"));
   console.log(CONFIG.MARKET.KRAKEN.getOrderBookURL("BTCUSD"));
   console.log(CONFIG.MARKET.MEXC.getOrderBookURL("BTC_USDT"));
