@@ -7,13 +7,6 @@ const cryptoUtilities = require("./cryptoUtilities");
 const hostname = "127.0.0.1";
 const port = 3000;
 
-const sleep = (milliseconds) => {
-  const date = Date.now();
-  let currentDate = null;
-  do {
-    currentDate = Date.now();
-  } while (currentDate - date < milliseconds);
-};
 const requestMarketData = () => {
   const ftxQuotes = fetch(CONFIG.MARKET.FTX.APIURL + "markets")
     .then((res) => res.json())
@@ -139,7 +132,13 @@ const requestMarketData = () => {
       };
     });
 
-  Promise.all([mexcQuotes, gateIOQuotes]).then((res) => {
+  Promise.all([
+    ftxQuotes,
+    krakenQuotes,
+    mexcQuotes,
+    gateIOQuotes,
+    coinTigerQuotes,
+  ]).then((res) => {
     displayArbitrage(res);
   });
 };
@@ -269,7 +268,15 @@ const displayArbitrage = (marketsQuotes) => {
 
           const buyOB = orderBook.buyMarketInfo.processOBData(res[0], "asks");
           const sellOB = orderBook.sellMarketInfo.processOBData(res[1], "bids");
-          cryptoUtilities.calculateProfitFromOB(buyOB, sellOB);
+          const { tBuy, tSell } = cryptoUtilities.calculateProfitFromOB(
+            buyOB,
+            sellOB,
+            orderBook
+          );
+          console.log("---- xx ---- xx ---- xx ---");
+          console.log(orderBook.buy, "tBuy ", tBuy);
+          console.log(orderBook.sell, "tSell ", tSell);
+          console.log("----- xxx ----- xx --- xxx ---");
           // console.log(
           //   orderBook.buyMarket,
           //   "Buy Order Book for",

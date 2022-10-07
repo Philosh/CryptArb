@@ -1,17 +1,13 @@
-const calculateProfitFromOB = (buyOB, sellOB) => {
+const calculateProfitFromOB = (buyOB, sellOB, orderBook) => {
   let [tBuy, tSell, nBuy, nSell] = [0, 0, 0, 0];
-  console.log(buyOB, sellOB);
-  let tempBuyOb = {
-    ...buyOB,
-  };
-  let tempSellOb = {
-    ...sellOB,
-  };
+  let tempBuyOb = buyOB.map((e) => e);
+  let tempSellOb = sellOB.map((e) => e);
   let buyPrice = tempBuyOb[nBuy].price;
   let sellPrice = tempSellOb[nSell].price;
-  while (buyPrice < sellPrice * 1.004) {
-    let buyQty = tempBuyOb[nBuy];
-    let sellQty = tempSellOb[nSell];
+
+  while (buyPrice * 1.004 < sellPrice) {
+    let buyQty = tempBuyOb[nBuy].quantity;
+    let sellQty = tempSellOb[nSell].quantity;
     if (buyQty > sellQty) {
       const cBuy = buyPrice * tempSellOb[nSell].quantity;
       const cSell = sellPrice * tempSellOb[nSell].quantity;
@@ -39,17 +35,14 @@ const calculateProfitFromOB = (buyOB, sellOB) => {
       nSell += 1;
     }
 
-    if (tempBuyOb[nBuy] === undefined) {
-      console.log("buyOb", buyOB, "sellOb", sellOB);
-    }
-
     buyPrice =
       nBuy < tempBuyOb.length && nSell < tempSellOb.length
         ? tempBuyOb[nBuy].price
-        : tempSellOb[nSell - 1].price;
+        : Number.MAX_SAFE_INTEGER;
     sellPrice = nSell < tempSellOb.length ? tempSellOb[nSell].price : 0;
   }
-  console.log("tBuy", tBuy, "tSell", tSell);
+
+  return { tBuy, tSell };
 };
 
 const findVal = (object, key) => {

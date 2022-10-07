@@ -12,7 +12,7 @@ const MARKET = {
     processOBData: (ob, bidOrAsk) => {
       return cryptoUtilities
         .findVal(ob, bidOrAsk)
-        .map((e) => ({ price: e[0], quantity: e[1] }));
+        .map((e) => ({ price: parseFloat(e[0]), quantity: parseFloat(e[1]) }));
     },
   },
   KRAKEN: {
@@ -25,7 +25,7 @@ const MARKET = {
     processOBData: (ob, bidOrAsk) => {
       return cryptoUtilities
         .findVal(ob, bidOrAsk)
-        .map((e) => ({ price: e[0], quantity: e[1] }));
+        .map((e) => ({ price: parseFloat(e[0]), quantity: parseFloat(e[1]) }));
     },
   },
   COINTIGER: {
@@ -45,7 +45,7 @@ const MARKET = {
       bidOrAsk = bidOrAsk == "bids" ? "buys" : bidOrAsk;
       return cryptoUtilities
         .findVal(ob, bidOrAsk)
-        .map((e) => ({ price: e[0], quantity: e[1] }));
+        .map((e) => ({ price: parseFloat(e[0]), quantity: parseFloat(e[1]) }));
     },
   },
   MEXC: {
@@ -62,7 +62,10 @@ const MARKET = {
       );
     },
     processOBData: (ob, bidOrAsk) => {
-      return cryptoUtilities.findVal(ob, bidOrAsk);
+      return cryptoUtilities.findVal(ob, bidOrAsk).map((e) => ({
+        price: parseFloat(e.price),
+        quantity: parseFloat(e.quantity),
+      }));
     },
   },
   GATEIO: {
@@ -82,7 +85,7 @@ const MARKET = {
     processOBData: (ob, bidOrAsk) => {
       return cryptoUtilities
         .findVal(ob, bidOrAsk)
-        .map((e) => ({ price: e[0], quantity: e[1] }));
+        .map((e) => ({ price: parseFloat(e[0]), quantity: parseFloat(e[1]) }));
     },
   },
 };
