@@ -1,18 +1,12 @@
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import List
 
-
-class Interval(BaseModel):
-    interval: int
-
+from app import calculate_price_delta
 
 app = FastAPI()
 
 origins = ["http://localhost:3000"]
-
 
 app.add_middleware(
     CORSMiddleware,
@@ -22,12 +16,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-interval = {"interval": 3}
 
+@app.get(path="/arb")
+async def get_price_delta():
 
-@app.get(path="/arb", response_model=Interval)
-def get_interval():
-    return Interval(interval=-1)
+    price_delta = await calculate_price_delta()
+    return price_delta
 
 
 if __name__ == "__main__":
